@@ -33,6 +33,7 @@ class ScalewayDSAlgorithm(Enum):
     ed25519 = "15"
     ed448 = "16"
 
+
 class ScalewayClientException(ProviderException):
     pass
 
@@ -99,7 +100,8 @@ class ScalewayClient(object):
 
     def zone_ds_records(self, domain):
         try:
-            return self._request('GET', f'/domains/{domain}').json()['dnssec']['ds_records']
+            return self._request('GET', f'/domains/{domain}'
+                                 ).json()['dnssec']['ds_records']
         except ScalewayClientForbidden:
             return []
 
@@ -356,14 +358,16 @@ class ScalewayProvider(BaseProvider):
                 value = {
                     'flags': record["key_id"],
                     'protocol': record["algorithm"],
-                    'algorithm': ScalewayDSAlgorithm[record["digest"]["type"]].value,
+                    'algorithm':
+                        ScalewayDSAlgorithm[record["digest"]["type"]].value,
                     'public_key': record["digest"]["digest"],
                 }
             else:
                 value = {
                     'key_tag': record["key_id"],
                     'algorithm': record["algorithm"],
-                    'digest_type': ScalewayDSAlgorithm[record["digest"]["type"]].value,
+                    'digest_type':
+                        ScalewayDSAlgorithm[record["digest"]["type"]].value,
                     'digest': record["digest"]["digest"],
                 }
             values.append(value)
@@ -503,7 +507,7 @@ class ScalewayProvider(BaseProvider):
                 return []
 
         return self._zone_records[zone.name]
-    
+
     def zone_ds_records(self, zone):
         if zone.name not in self._zone_ds_records:
             try:
@@ -539,7 +543,8 @@ class ScalewayProvider(BaseProvider):
                                     source=self, lenient=lenient)
                 zone.add_record(record, lenient=lenient)
 
-        exists = zone.name in self._zone_records or zone.name in self._zone_ds_records
+        exists = zone.name in self._zone_records \
+            or zone.name in self._zone_ds_records
         self.log.info('populate:   found %s records, exists=%s',
                       len(zone.records) - before, exists)
         return exists
@@ -619,11 +624,11 @@ class ScalewayProvider(BaseProvider):
 
     def _params_for_DS(self, record):
         datas = []
-        
+
         # Scaleway does not support the use of more than one DS key
         if len(record.values) > 1:
             raise ScalewayProviderException('Only one DS record is supported')
-        
+
         for v in record.values:
             if self.OLD_DS_FIELDS:
                 data = {
@@ -790,10 +795,10 @@ class ScalewayProvider(BaseProvider):
             'disallow_new_zone_creation': not self._client.create_zone,
             'changes': updates
         })
-        
+
     def _apply_disable_dnssec(self, zone):
         self._client.dnssec_disable(zone)
-        
+
     def _apply_enable_dnssec(self, zone, update):
         self._client.dnssec_enable(zone, {
             'ds_record': update
