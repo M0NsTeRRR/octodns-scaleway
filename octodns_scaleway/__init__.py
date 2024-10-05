@@ -123,6 +123,7 @@ class ScalewayClient(object):
 class ScalewayProvider(BaseProvider):
     SUPPORTS_GEO = False
     SUPPORTS_DYNAMIC = True
+    SUPPORTS_ROOT_NS = True
     SUPPORTS_POOL_VALUE_STATUS = False
     SUPPORTS = set((['A', 'AAAA', 'ALIAS', 'CAA', 'CNAME', 'DNAME',
                      'DS', 'LOC', 'MX', 'NAPTR', 'NS', 'PTR', 'SPF',
@@ -695,7 +696,7 @@ class ScalewayProvider(BaseProvider):
 
         pools = record.dynamic.pools
         rules = record.dynamic.rules
-        healthcheck = record._octodns.get('healthcheck', {})
+        healthcheck = record.octodns.get('healthcheck', {})
 
         n = 0
         for pool in pools:

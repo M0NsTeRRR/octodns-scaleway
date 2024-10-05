@@ -94,6 +94,11 @@ class TestScalewayProvider(TestCase):
             'type': 'ALIAS',
             'value': 'alias.unit.tests.'
         }),
+        ('', {
+            'ttl': 600,
+            'type': 'NS',
+            'value': ['ns0.dom.scw.cloud.', 'ns1.dom.scw.cloud.']
+        }),
         ('_srv._tcp2', {
             'ttl': 1800,
             'type': 'SRV',
@@ -179,7 +184,8 @@ class TestScalewayProvider(TestCase):
                     {
                         'pool': 'pool-0',
                         'geos': ['EU']
-                    }
+                    },
+                    {'pool': 'pool-0'},
                 ]
             }
         }),
@@ -303,6 +309,10 @@ class TestScalewayProvider(TestCase):
                 mock.get('/domain/v2beta1/dns-zones/'
                          'unit.tests/records?page_size=1000', text=fh.read())
 
+            with open('tests/fixtures/scaleway-domain-ok.json') as fh:
+                mock.get('/domain/v2beta1/domains/'
+                         'unit.tests', text=fh.read())
+
             zone = Zone('unit.tests.', [])
 
             provider.populate(zone)
@@ -324,6 +334,10 @@ class TestScalewayProvider(TestCase):
         with requests_mock() as mock:
             with open('tests/fixtures/scaleway-nok.json') as fh:
                 mock.get(ANY, text=fh.read())
+
+            with open('tests/fixtures/scaleway-domain-ok.json') as fh:
+                mock.get('/domain/v2beta1/domains/'
+                         'unit.tests', text=fh.read())
 
             zone = Zone('unit.tests.', [])
             provider.populate(zone, lenient=True)
@@ -367,6 +381,8 @@ class TestScalewayProvider(TestCase):
 
             mock.get('/domain/v2beta1/dns-zones/unit.not-exists'
                      '/records?page_size=1000', status_code=403)
+            mock.get('/domain/v2beta1/domains/unit.not-exists',
+                     status_code=403)
             mock.patch('/domain/v2beta1/dns-zones/'
                        'unit.not-exists/records', status_code=403,
                        text='{"message": "domain not found"}')
@@ -390,6 +406,13 @@ class TestScalewayProvider(TestCase):
             provider = ScalewayProvider('test', 'token', True)
 
             zone_dynamic = Zone('unit.dynamic.', [])
+            with open('tests/fixtures/scaleway-nok.json') as fh:
+                mock.get('/domain/v2beta1/dns-zones/unit.dynamic'
+                         '/records?page_size=1000', text=fh.read())
+            with open('tests/fixtures/scaleway-domain-ok.json') as fh:
+                mock.get('/domain/v2beta1/domains/unit.dynamic',
+                         text=fh.read())
+
             zone_dynamic.add_record(Record.new(zone_dynamic, 'dynamic', {
                 'ttl': 300,
                 'type': 'A',
@@ -426,7 +449,7 @@ class TestScalewayProvider(TestCase):
                     'rules': [{
                         'pool': 'pool-0',
                         'geos': ['NA-US-KY']
-                    }]
+                    }, {'pool': 'pool-0'}]
                 }
             }), replace=True)
 
@@ -454,10 +477,15 @@ class TestScalewayProvider(TestCase):
                             ],
                         },
                     },
-                    'rules': [{
-                        'pool': 'pool-0',
-                        'geos': ['NA-US']
-                    }]
+                    'rules': [
+                        {
+                            'pool': 'pool-0',
+                            'geos': ['NA-US']
+                        },
+                        {
+                            'pool': 'pool-0'
+                        }
+                    ]
                 }
             }), replace=True)
 
@@ -521,6 +549,7 @@ class TestScalewayProvider(TestCase):
         provider._client._request.assert_has_calls([
             # created some of the record with expected data
             call('GET', '/dns-zones/unit.tests/records?page_size=1000'),
+            call('GET', '/domains/unit.tests'),
             call('PATCH', '/dns-zones/unit.tests/records', data={
                 'return_all_records': False,
                 'disallow_new_zone_creation': True,
@@ -533,6 +562,24 @@ class TestScalewayProvider(TestCase):
                                     'ttl': 1800,
                                     'type': 'ALIAS',
                                     'data': 'alias.unit.tests.'
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        'add': {
+                            'records': [
+                                {
+                                    'name': '@',
+                                    'ttl': 600,
+                                    'type': 'NS',
+                                    'data': 'ns0.dom.scw.cloud.'
+                                },
+                                {
+                                    'name': '@',
+                                    'ttl': 600,
+                                    'type': 'NS',
+                                    'data': 'ns1.dom.scw.cloud.'
                                 }
                             ]
                         }
@@ -601,7 +648,8 @@ class TestScalewayProvider(TestCase):
                                                 'countries': [],
                                                 'data': '2.2.2.3'
                                             }
-                                        ]
+                                        ],
+                                        'default': '2.2.2.2'
                                     }
                                 }
                             ]
@@ -643,7 +691,7 @@ class TestScalewayProvider(TestCase):
                                         'ips': ['2.2.2.2', '2.2.2.3'],
                                         'must_contain': None,
                                         'url': 'HTTPS://127.0.0.1:443/check',
-                                        'user_agent': 'scaleway-octodns/0.0.4',
+                                        'user_agent': 'scaleway-octodns/0.1.0',
                                         'strategy': 'all'
                                     }
                                 }
@@ -754,7 +802,7 @@ class TestScalewayProvider(TestCase):
             }),
         ])
         # expected number of total calls
-        self.assertEqual(2, provider._client._request.call_count)
+        self.assertEqual(3, provider._client._request.call_count)
 
         provider._client._request.reset_mock()
 
@@ -779,6 +827,8 @@ class TestScalewayProvider(TestCase):
                 'type': 'A',
             }
         ])
+        provider._client.zone_ds_records = Mock(return_value=[])
+
         # Domain exists, we don't care about return
         resp.json.side_effect = ['{}']
 
@@ -800,6 +850,14 @@ class TestScalewayProvider(TestCase):
                 'disallow_new_zone_creation': True,
                 'changes': [
                     {
+                        'delete': {
+                            'idFields': {
+                                'type': 'A',
+                                'name': 'www'
+                            }
+                        }
+                    },
+                    {
                         'set': {
                             'idFields': {
                                 'type': 'A',
@@ -814,15 +872,7 @@ class TestScalewayProvider(TestCase):
                                 }
                             ]
                         }
-                    },
-                    {
-                        'delete': {
-                            'idFields': {
-                                'type': 'A',
-                                'name': 'www'
-                            }
-                        }
                     }
                 ]
             })
-        ], any_order=True)
+        ])
