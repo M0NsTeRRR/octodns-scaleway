@@ -28,7 +28,7 @@ setup(
     packages=find_packages(),
     python_requires='>=3.6',
     install_requires=(
-        'octodns>=0.9.14',
+        'octodns>=1.0.0',
         'requests>=2.27.0',
     ),
     url='https://github.com/scaleway/octodns-scaleway',
