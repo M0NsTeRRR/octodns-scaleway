@@ -812,6 +812,17 @@ class TestScalewayProvider(TestCase):
                         }
                     }
                 ]
+            }),
+            call('POST', '/domains/unit.tests/enable-dnssec', data={
+                'ds_record': {
+                    'key_id': 15347,
+                    'algorithm': 'ecdsap256sha256',
+                    'digest': {
+                        'type': 'sha_256',
+                        'digest': '4E6DA3FC9374700C0A4ECE3C13D344B'
+                                  '2CEC68EC8083E0580D30322B56ED3A2B7'
+                    }
+                }
             })
         ])
         # expected number of total calls
