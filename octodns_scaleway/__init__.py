@@ -19,19 +19,26 @@ __API_VERSION__ = 'v2beta1'
 
 
 class ScalewayDSAlgorithm(Enum):
-    rsamd5 = "1"
-    dh = "2"
-    dsa = "3"
-    rsasha1 = "5"
-    dsa_nsec3_sha1 = "6"
-    rsasha1_nsec3_sha1 = "7"
-    rsasha256 = "8"
-    rsasha512 = "10"
-    ecc_gost = "12"
-    ecdsap256sha256 = "13"
-    ecdsap384sha384 = "14"
-    ed25519 = "15"
-    ed448 = "16"
+    rsamd5 = 1
+    dh = 2
+    dsa = 3
+    rsasha1 = 5
+    dsa_nsec3_sha1 = 6
+    rsasha1_nsec3_sha1 = 7
+    rsasha256 = 8
+    rsasha512 = 10
+    ecc_gost = 12
+    ecdsap256sha256 = 13
+    ecdsap384sha384 = 14
+    ed25519 = 15
+    ed448 = 16
+
+
+class ScalewayDSDigestType(Enum):
+    sha_1 = 1
+    sha_256 = 2
+    gost_r_34_11_94 = 3
+    sha_384 = 4
 
 
 class ScalewayClientException(ProviderException):
@@ -358,17 +365,19 @@ class ScalewayProvider(BaseProvider):
             if self.OLD_DS_FIELDS:
                 value = {
                     'flags': record["key_id"],
-                    'protocol': record["algorithm"],
+                    'protocol':
+                        ScalewayDSAlgorithm[record["algorithm"]].value,
                     'algorithm':
-                        ScalewayDSAlgorithm[record["digest"]["type"]].value,
+                        ScalewayDSDigestType[record["digest"]["type"]].value,
                     'public_key': record["digest"]["digest"],
                 }
             else:
                 value = {
                     'key_tag': record["key_id"],
-                    'algorithm': record["algorithm"],
+                    'algorithm':
+                        ScalewayDSAlgorithm[record["algorithm"]].value,
                     'digest_type':
-                        ScalewayDSAlgorithm[record["digest"]["type"]].value,
+                        ScalewayDSDigestType[record["digest"]["type"]].value,
                     'digest': record["digest"]["digest"],
                 }
             values.append(value)
@@ -634,18 +643,18 @@ class ScalewayProvider(BaseProvider):
             if self.OLD_DS_FIELDS:
                 data = {
                     'key_id': v.flags,
-                    'algorithm': v.protocol,
+                    'algorithm': ScalewayDSAlgorithm(v.protocol).name,
                     'digest': {
-                        'type': v.algorithm,
+                        'type': ScalewayDSDigestType(v.algorithm).name,
                         'digest': v.public_key
                     }
                 }
             else:
                 data = {
                     'key_id': v.key_tag,
-                    'algorithm': v.algorithm,
+                    'algorithm': ScalewayDSAlgorithm(v.algorithm).name,
                     'digest': {
-                        'type': v.digest_type,
+                        'type': ScalewayDSDigestType(v.digest_type).name,
                         'digest': v.digest
                     }
                 }

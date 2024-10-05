@@ -99,6 +99,19 @@ class TestScalewayProvider(TestCase):
             'type': 'NS',
             'value': ['ns0.dom.scw.cloud.', 'ns1.dom.scw.cloud.']
         }),
+        ('', {
+            'ttl': 3600,
+            'type': 'DS',
+            'value': [
+                {
+                    'key_tag': 15347,
+                    'algorithm': 13,
+                    'digest_type': 2,
+                    'digest': '4E6DA3FC9374700C0A4ECE3C13D34'
+                              '4B2CEC68EC8083E0580D30322B56ED3A2B7'
+                }
+            ]
+        }),
         ('_srv._tcp2', {
             'ttl': 1800,
             'type': 'SRV',
@@ -318,14 +331,14 @@ class TestScalewayProvider(TestCase):
             provider.populate(zone)
             self.assertEqual(15, len(zone.records))
             changes = self.expected.changes(zone, provider)
-            self.assertEqual(27, len(changes))
+            self.assertEqual(28, len(changes))
 
         # 2nd populate makes no network calls/all from cache
         again = Zone('unit.tests.', [])
         provider.populate(again)
         self.assertEqual(15, len(again.records))
         changes = self.expected.changes(zone, provider)
-        self.assertEqual(27, len(changes))
+        self.assertEqual(28, len(changes))
 
         # bust the cache
         del provider._zone_records[zone.name]
@@ -799,10 +812,10 @@ class TestScalewayProvider(TestCase):
                         }
                     }
                 ]
-            }),
+            })
         ])
         # expected number of total calls
-        self.assertEqual(3, provider._client._request.call_count)
+        self.assertEqual(4, provider._client._request.call_count)
 
         provider._client._request.reset_mock()
 
@@ -827,7 +840,20 @@ class TestScalewayProvider(TestCase):
                 'type': 'A',
             }
         ])
-        provider._client.zone_ds_records = Mock(return_value=[])
+
+        provider._client.zone_ds_records = Mock(return_value=[
+            {
+                'key_id': 51604,
+                'algorithm': 'ecdsap256sha256',
+                'digest': {
+                    'type': 'sha_384',
+                    'digest': 'f0dff3c18d01fb52d4a80d0d2614fe1c2be12d6e98fa'
+                              '400754ee511d1aca054666bfad9151b0b404efaa96a1'
+                              '0b2abdbc',
+                    'public_key': None
+                }
+            }
+        ])
 
         # Domain exists, we don't care about return
         resp.json.side_effect = ['{}']
@@ -838,11 +864,25 @@ class TestScalewayProvider(TestCase):
             'type': 'A',
             'value': '3.2.3.4'
         }))
+        # update DS record
+        wanted.add_record(Record.new(wanted, '', {
+            'ttl': 3600,
+            'type': 'DS',
+            'value': [
+                {
+                    'key_tag': 15347,
+                    'algorithm': 13,
+                    'digest_type': 2,
+                    'digest': '4E6DA3FC9374700C0A4ECE3C13D34'
+                              '4B2CEC68EC8083E0580D30322B56ED3A2B7'
+                }
+            ]
+        }))
 
         plan = provider.plan(wanted)
         self.assertTrue(plan.exists)
-        self.assertEqual(2, len(plan.changes))
-        self.assertEqual(2, provider.apply(plan))
+        self.assertEqual(3, len(plan.changes))
+        self.assertEqual(3, provider.apply(plan))
 
         provider._client._request.assert_has_calls([
             call('PATCH', '/dns-zones/unit.tests/records', data={
@@ -874,5 +914,46 @@ class TestScalewayProvider(TestCase):
                         }
                     }
                 ]
+            }),
+            call('POST', '/domains/unit.tests/enable-dnssec', data={
+                'ds_record': {
+                    'key_id': 15347,
+                    'algorithm': 'ecdsap256sha256',
+                    'digest': {
+                        'type': 'sha_256',
+                        'digest': '4E6DA3FC9374700C0A4ECE3C'
+                                  '13D344B2CEC68EC8083E0580D30322B56ED3A2B7'
+                    }
+                }
             })
+        ])
+
+        # disable dnssec
+        provider._client.zone_records = Mock(return_value=[])
+        provider._client.zone_ds_records = Mock(return_value=[
+            {
+                'key_id': 51604,
+                'algorithm': 'ecdsap256sha256',
+                'digest': {
+                    'type': 'sha_384',
+                    'digest': 'f0dff3c18d01fb52d4a80d0d2614fe1c2be12d6e98fa'
+                              '400754ee511d1aca054666bfad9151b0b404efaa96a1'
+                              '0b2abdbc',
+                    'public_key': None
+                }
+            }
+        ])
+
+        # Domain exists, we don't care about return
+        resp.json.side_effect = ['{}']
+
+        wanted = Zone('unit.tests.', [])
+
+        plan = provider.plan(wanted)
+        self.assertTrue(plan.exists)
+        self.assertEqual(1, len(plan.changes))
+        self.assertEqual(1, provider.apply(plan))
+
+        provider._client._request.assert_has_calls([
+            call('POST', '/domains/unit.tests/disable-dnssec')
         ])
